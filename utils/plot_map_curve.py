@@ -6,9 +6,9 @@ import numpy as np
 import os
 import sys
 
-from utils.calc_mAP import genTableAP
+from calc_mAP import genTableAP
 
-path = 'exps/snapshots/ppn.pth.tar'
+path = 'exps/snapshots/ppn_best.pth.tar'
 
 checkpoint = torch.load(path)
 

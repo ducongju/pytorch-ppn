@@ -124,8 +124,8 @@ class PPN_MPPE_MPI_Dataset(data.Dataset):
         self_visibility = self_ori_visibility * self_visibility
 
         # Generate target maps
-        grid_x = flipped_im.shape[1] / self.stride
-        grid_y = flipped_im.shape[0] / self.stride 
+        grid_x = flipped_im.shape[1] // self.stride
+        grid_y = flipped_im.shape[0] // self.stride 
 
         conf_target = target_gen.gen_gaussian_maps(flipped_joints, self_visibility, self.stride, grid_x, grid_y, self.sigma)
 

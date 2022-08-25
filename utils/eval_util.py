@@ -177,17 +177,18 @@ def single_image_testing_on_mpi_mp_dataset(net, im, objpos=None, \
     batch_input_im = input_im_list[0].view(-1, 3, crop_size, crop_size)
     for smi in range(1, len(input_im_list)):
         batch_input_im = torch.cat((batch_input_im, input_im_list[smi].view(-1, 3, crop_size, crop_size)), 0)
-    batch_input_im = batch_input_im.cuda(async=True)
+    batch_input_im = batch_input_im.cuda()
     batch_input_var = torch.autograd.Variable(batch_input_im, volatile=True)
 
     # Preparing flipped input variable
     batch_flipped_input_im = flipped_input_im_list[0].view(-1, 3, crop_size, crop_size)
     for smi in range(1, len(flipped_input_im_list)):
         batch_flipped_input_im = torch.cat((batch_flipped_input_im, flipped_input_im_list[smi].view(-1, 3, crop_size, crop_size)), 0)
-    batch_flipped_input_im = batch_flipped_input_im.cuda(async=True)
+    batch_flipped_input_im = batch_flipped_input_im.cuda()
     batch_flipped_input_var = torch.autograd.Variable(batch_flipped_input_im, volatile=True)
 
     # Get predicted heatmaps and convert them to numpy array
+    batch_input_var = batch_input_var.type(torch.FloatTensor)
     pose_outputs, orie_outputs = net(batch_input_var)
     pose_output = pose_outputs[-1]
     pose_output = pose_output.data
@@ -197,6 +198,7 @@ def single_image_testing_on_mpi_mp_dataset(net, im, objpos=None, \
     orie_output = orie_output.cpu().numpy()
     
     # Get predicted flipped heatmaps and convert them to numpy array
+    batch_flipped_input_var = batch_flipped_input_var.type(torch.FloatTensor)
     flipped_pose_outputs, flipped_orie_outputs = net(batch_flipped_input_var)
     flipped_pose_output = flipped_pose_outputs[-1]
     flipped_pose_output = flipped_pose_output.data
@@ -355,8 +357,8 @@ def single_image_testing_on_mpi_mp_dataset(net, im, objpos=None, \
                     offset_x = orie_maps[ji * 2, g_y, g_x]
                     offset_y = orie_maps[ji * 2 + 1, g_y, g_x]
 
-                    flipped_offset_x = flipped_orie_maps[flipped_idx[ji] * 2, g_y, crop_size / stride - g_x - 1]
-                    flipped_offset_y = flipped_orie_maps[flipped_idx[ji] * 2 + 1, g_y, crop_size / stride - g_x - 1]
+                    flipped_offset_x = flipped_orie_maps[int(flipped_idx[ji] * 2), int(g_y), int(crop_size / stride - g_x - 1)]
+                    flipped_offset_y = flipped_orie_maps[int(flipped_idx[ji] * 2 + 1), int(g_y), int(crop_size / stride - g_x - 1)]
                     offset_x = (offset_x - flipped_offset_x) / 2.0
                     offset_y = (offset_y + flipped_offset_y) / 2.0
 

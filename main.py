@@ -121,7 +121,10 @@ def main():
     print('Finished loading evaluation json file')
 
     # MSE Loss function for confidence and orientation supervision
-    pose_criterion = nn.MSELoss().cuda()
+    # pose_criterion = nn.MSELoss().cuda()
+
+    pose_criterion = FocalL2Loss().cuda()
+
     orie_criterion = nn.SmoothL1Loss().cuda()
 
     # RMSProp as the optimizer
@@ -211,10 +214,10 @@ def train(train_loader, model, pose_criterion, orie_criterion, optimizer, epoch)
     iter_start_time = time.time()
     for i, (im, conf_target, orie_target, orie_target_weight) in enumerate(train_loader):
 
-        im = im.cuda(async=True)
-        conf_target = conf_target.float().cuda(async=True)
-        orie_target = orie_target.float().cuda(async=True)
-        orie_target_weight = orie_target_weight.float().cuda(async=True)
+        im = im.cuda()
+        conf_target = conf_target.float().cuda()
+        orie_target = orie_target.float().cuda()
+        orie_target_weight = orie_target_weight.float().cuda()
 
         input_var = torch.autograd.Variable(im)
         conf_target_var = torch.autograd.Variable(conf_target)
@@ -222,6 +225,7 @@ def train(train_loader, model, pose_criterion, orie_criterion, optimizer, epoch)
         orie_target_weight_var = torch.autograd.Variable(orie_target_weight)
         orie_target_var = torch.mul(orie_target_var, orie_target_weight_var)        
 
+        input_var = input_var.type(torch.FloatTensor)
         conf_output_list, orie_output_list = model(input_var)
 
         conf_loss = pose_criterion(conf_output_list[0], conf_target_var)
@@ -237,7 +241,8 @@ def train(train_loader, model, pose_criterion, orie_criterion, optimizer, epoch)
             orie_loss = orie_criterion(orie_output, orie_target_var)
             total_loss = total_loss + conf_loss + orie_loss
 
-        losses.update(total_loss.data[0], im.size(0))
+        # losses.update(total_loss.data[0], im.size(0))
+        losses.update(total_loss.item(), im.size(0))
 
         optimizer.zero_grad()
         total_loss.backward()
@@ -347,6 +352,52 @@ def adjust_learning_rate(optimizer, epoch):
         param_group['lr'] = lr
 
     return lr
+
+
+class FocalL2Loss(nn.Module):
+    """
+    Compute focal l2 loss between predict and groundtruth
+    :param thre: the threshold to distinguish between the foreground
+                 heatmap pixels and the background heatmap pixels
+    :param alpha beta: compensation factors to reduce the punishment of easy
+                 samples (both easy foreground pixels and easy background pixels) 
+    """
+    def __init__(self, thre=0.01, alpha=0.1, beta=0.02):
+        super().__init__()
+        self.thre = thre
+        self.alpha = alpha
+        self.beta = beta
+    
+    def forward(self, pred, gt):
+        assert pred.size() == gt.size()
+        st = torch.where(torch.ge(gt, self.thre), pred - self.alpha, 1 - pred - self.beta)
+        factor = torch.abs(1. - st)
+        loss = (pred - gt)**2 * factor
+        loss = loss.mean(dim=3).mean(dim=2).mean(dim=1).mean(dim=0)
+        return loss
+
+
+class FocalL2Loss_nomask(nn.Module):
+    """
+    Compute focal l2 loss between predict and groundtruth
+    :param thre: the threshold to distinguish between the foreground
+                 heatmap pixels and the background heatmap pixels
+    :param alpha beta: compensation factors to reduce the punishment of easy
+                 samples (both easy foreground pixels and easy background pixels) 
+    """
+    def __init__(self, thre=0.01, alpha=0.1, beta=0.02):
+        super().__init__()
+        self.thre = thre
+        self.alpha = alpha
+        self.beta = beta
+    
+    def forward(self, pred, gt):
+        assert pred.size() == gt.size()
+        st = torch.where(torch.ge(gt, self.thre), pred - self.alpha, 1 - pred - self.beta)
+        factor = torch.abs(1. - st)
+        loss = ((pred - gt)**2 * factor).expand_as(pred)
+        loss = loss.mean(dim=3).mean(dim=2).mean(dim=1)
+        return loss
 
 if __name__ == '__main__':
     main()
